@@ -1,0 +1,482 @@
+# =========================================================================================
+# Copyright (C) 2024 Pierre Smeyers and contributors
+#
+# This program is free software; you can redistribute it and/or modify it under the terms 
+# of the GNU Lesser General Public License as published by the Free Software Foundation; 
+# either version 3 of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+# without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# See the GNU Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public License along with this 
+# program; if not, write to the Free Software Foundation, Inc., 51 Franklin Street, Fifth 
+# Floor, Boston, MA  02110-1301, USA.
+# =========================================================================================
+spec:
+  inputs:
+
+    image:
+      description: The Docker image used to run `cli-template-build-cosign`
+      default: docker.io/template-build-cosign:1.2.3
+    build-args:
+      description: Arguments used by the build job
+      default: build --with-default-args
+    lint-disabled:
+      description: Disable TPL lint
+      type: boolean
+      default: false
+    lint-image:
+      description: The Docker image used to run the lint tool
+      default: docker.io/template-build-cosign-lint:latest
+    lint-args:
+      description: Lint [options and arguments](link-to-the-cli-options)
+      default: --serevity=medium
+    depcheck-image:
+      description: The Docker image used to run the dependency check tool
+      default: docker.io/template-build-cosign-depcheck:latest
+    depcheck-args:
+      description: Dependency check [options and arguments](link-to-the-cli-options)
+      default: ''
+    publish-enabled:
+      description: Enable Publish
+      type: boolean
+      default: false
+    publish-args:
+      description: Arguments used by the publish job
+      default: publish --with-default-args
+---
+# default workflow rules: Merge Request pipelines
+workflow:
+  rules:
+    # prevent MR pipeline originating from production or integration branch(es)
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ $PROD_REF || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ $INTEG_REF'
+      when: never
+    # on non-prod, non-integration branches: prefer MR pipeline over branch pipeline
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_COMMIT_REF_NAME !~ $PROD_REF && $CI_COMMIT_REF_NAME !~ $INTEG_REF'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*tag(,[^],]*)*\]/" && $CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*branch(,[^],]*)*\]/" && $CI_COMMIT_BRANCH'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*mr(,[^],]*)*\]/" && $CI_MERGE_REQUEST_ID'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*default(,[^],]*)*\]/" && $CI_COMMIT_REF_NAME =~ $CI_DEFAULT_BRANCH'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*prod(,[^],]*)*\]/" && $CI_COMMIT_REF_NAME =~ $PROD_REF'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*integ(,[^],]*)*\]/" && $CI_COMMIT_REF_NAME =~ $INTEG_REF'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ "/\[(ci skip|skip ci) on ([^],]*,)*dev(,[^],]*)*\]/" && $CI_COMMIT_REF_NAME !~ $PROD_REF && $CI_COMMIT_REF_NAME !~ $INTEG_REF'
+      when: never
+    - when: always
+
+# test job prototype: implement adaptive pipeline rules
+.test-policy:
+  rules:
+    # on tag: auto & failing
+    - if: $CI_COMMIT_TAG
+    # on ADAPTIVE_PIPELINE_DISABLED: auto & failing
+    - if: '$ADAPTIVE_PIPELINE_DISABLED == "true"'
+    # on production or integration branch(es): auto & failing
+    - if: '$CI_COMMIT_REF_NAME =~ $PROD_REF || $CI_COMMIT_REF_NAME =~ $INTEG_REF'
+    # early stage (dev branch, no MR): manual & non-failing
+    - if: '$CI_MERGE_REQUEST_ID == null && $CI_OPEN_MERGE_REQUESTS == null'
+      when: manual
+      allow_failure: true
+    # Draft MR: auto & non-failing
+    - if: '$CI_MERGE_REQUEST_TITLE =~ /^Draft:.*/'
+      allow_failure: true
+    # else (Ready MR): auto & failing
+    - when: on_success
+
+variables:
+  # variabilized tracking image
+  TBC_TRACKING_IMAGE: registry.gitlab.com/to-be-continuous/tools/tracking:master
+
+  # Default Docker image (use a public image - can be overridden)
+  TPL_IMAGE: $[[ inputs.image ]]
+
+  TPL_BUILD_ARGS: $[[ inputs.build-args ]]
+
+  TPL_PUBLISH_ENABLED: $[[ inputs.publish-enabled ]]
+  TPL_PUBLISH_ARGS: $[[ inputs.publish-args ]]
+
+  TPL_LINT_DISABLED: $[[ inputs.lint-disabled ]]
+  TPL_LINT_IMAGE: $[[ inputs.lint-image ]]
+  TPL_LINT_ARGS: $[[ inputs.lint-args ]]
+
+  TPL_DEPCHECK_IMAGE: $[[ inputs.depcheck-image ]]
+  TPL_DEPCHECK_ARGS: $[[ inputs.depcheck-args ]]
+
+  # default production ref name (pattern)
+  PROD_REF: '/^(master|main)$/'
+  # default integration ref name (pattern)
+  INTEG_REF: '/^develop$/'
+
+stages:
+  - build
+  - test
+  - package-build
+  - package-test
+  - infra
+  - deploy
+  - acceptance
+  - publish
+  - infra-prod
+  - production
+
+.tpl-scripts: &tpl-scripts |
+  # BEGSCRIPT
+  set -e
+
+  function log_info() {
+    >&2 echo -e "[\\e[1;94mINFO\\e[0m] $*"
+  }
+
+  function log_warn() {
+    >&2 echo -e "[\\e[1;93mWARN\\e[0m] $*"
+  }
+
+  function log_error() {
+    >&2 echo -e "[\\e[1;91mERROR\\e[0m] $*"
+  }
+
+  function fail() {
+    log_error "$*"
+    exit 1
+  }
+
+  function assert_defined() {
+    if [[ -z "$1" ]]
+    then
+      log_error "$2"
+      exit 1
+    fi
+  }
+
+  function install_ca_certs() {
+    certs=$1
+    if [[ -z "$certs" ]]
+    then
+      return
+    fi
+
+    # List of typical bundles
+    bundles="/etc/ssl/certs/ca-certificates.crt"                            # Debian/Ubuntu/Gentoo etc.
+    bundles="${bundles} /etc/ssl/cert.pem"                                  # Alpine Linux
+    bundles="${bundles} /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem"  # CentOS/RHEL 7
+    bundles="${bundles} /etc/pki/tls/certs/ca-bundle.crt"                   # Fedora/RHEL 6
+    bundles="${bundles} /etc/ssl/ca-bundle.pem"                             # OpenSUSE
+    bundles="${bundles} /etc/pki/tls/cacert.pem"                            # OpenELEC
+
+    # Try to find the right bundle to update it with custom CA certificates
+    for bundle in ${bundles}
+    do
+      # import if bundle exists
+      if [[ -f "${bundle}" ]]
+      then
+        # Import certificates in bundle
+        echo "${certs}" | tr -d '\r' >> "${bundle}"
+
+        log_info "Custom CA certificates imported in \\e[33;1m${bundle}\\e[0m"
+        ca_imported=1
+        break
+      fi
+    done
+
+    if [[ -z "$ca_imported" ]]
+    then
+      log_warn "Could not import custom CA certificates !"
+    fi
+  }
+
+  function unscope_variables() {
+    _scoped_vars=$(env | awk -F '=' "/^scoped__[a-zA-Z0-9_]+=/ {print \$1}" | sort)
+    if [[ -z "$_scoped_vars" ]]; then return; fi
+    log_info "Processing scoped variables..."
+    for _scoped_var in $_scoped_vars
+    do
+      _fields=${_scoped_var//__/:}
+      _condition=$(echo "$_fields" | cut -d: -f3)
+      case "$_condition" in
+      if) _not="";;
+      ifnot) _not=1;;
+      *)
+        log_warn "... unrecognized condition \\e[1;91m$_condition\\e[0m in \\e[33;1m${_scoped_var}\\e[0m"
+        continue
+      ;;
+      esac
+      _target_var=$(echo "$_fields" | cut -d: -f2)
+      _cond_var=$(echo "$_fields" | cut -d: -f4)
+      _cond_val=$(eval echo "\$${_cond_var}")
+      _test_op=$(echo "$_fields" | cut -d: -f5)
+      case "$_test_op" in
+      defined)
+        if [[ -z "$_not" ]] && [[ -z "$_cond_val" ]]; then continue; 
+        elif [[ "$_not" ]] && [[ "$_cond_val" ]]; then continue; 
+        fi
+        ;;
+      equals|startswith|endswith|contains|in|equals_ic|startswith_ic|endswith_ic|contains_ic|in_ic)
+        # comparison operator
+        # sluggify actual value
+        _cond_val=$(echo "$_cond_val" | tr '[:punct:]' '_')
+        # retrieve comparison value
+        _cmp_val_prefix="scoped__${_target_var}__${_condition}__${_cond_var}__${_test_op}__"
+        _cmp_val=${_scoped_var#"$_cmp_val_prefix"}
+        # manage 'ignore case'
+        if [[ "$_test_op" == *_ic ]]
+        then
+          # lowercase everything
+          _cond_val=$(echo "$_cond_val" | tr '[:upper:]' '[:lower:]')
+          _cmp_val=$(echo "$_cmp_val" | tr '[:upper:]' '[:lower:]')
+        fi
+        case "$_test_op" in
+        equals*)
+          if [[ -z "$_not" ]] && [[ "$_cond_val" != "$_cmp_val" ]]; then continue; 
+          elif [[ "$_not" ]] && [[ "$_cond_val" == "$_cmp_val" ]]; then continue; 
+          fi
+          ;;
+        startswith*)
+          if [[ -z "$_not" ]] && [[ "$_cond_val" != "$_cmp_val"* ]]; then continue; 
+          elif [[ "$_not" ]] && [[ "$_cond_val" == "$_cmp_val"* ]]; then continue; 
+          fi
+          ;;
+        endswith*)
+          if [[ -z "$_not" ]] && [[ "$_cond_val" != *"$_cmp_val" ]]; then continue; 
+          elif [[ "$_not" ]] && [[ "$_cond_val" == *"$_cmp_val" ]]; then continue; 
+          fi
+          ;;
+        contains*)
+          if [[ -z "$_not" ]] && [[ "$_cond_val" != *"$_cmp_val"* ]]; then continue; 
+          elif [[ "$_not" ]] && [[ "$_cond_val" == *"$_cmp_val"* ]]; then continue; 
+          fi
+          ;;
+        in*)
+          if [[ -z "$_not" ]] && [[ "__${_cmp_val}__" != *"__${_cond_val}__"* ]]; then continue; 
+          elif [[ "$_not" ]] && [[ "__${_cmp_val}__" == *"__${_cond_val}__"* ]]; then continue; 
+          fi
+          ;;
+        esac
+        ;;
+      *)
+        log_warn "... unrecognized test operator \\e[1;91m${_test_op}\\e[0m in \\e[33;1m${_scoped_var}\\e[0m"
+        continue
+        ;;
+      esac
+      # matches
+      _val=$(eval echo "\$${_target_var}")
+      log_info "... apply \\e[32m${_target_var}\\e[0m from \\e[32m\$${_scoped_var}\\e[0m${_val:+ (\\e[33;1moverwrite\\e[0m)}"
+      _val=$(eval echo "\$${_scoped_var}")
+      export "${_target_var}"="${_val}"
+    done
+    log_info "... done"
+  }
+
+  # evaluate and export a secret
+  # - $1: secret variable name
+  function eval_secret() {
+    name=$1
+    value=$(eval echo "\$${name}")
+    case "$value" in
+    @b64@*)
+      decoded=$(mktemp)
+      errors=$(mktemp)
+      if echo "$value" | cut -c6- | base64 -d > "${decoded}" 2> "${errors}"
+      then
+        # shellcheck disable=SC2086
+        export ${name}="$(cat ${decoded})"
+        log_info "Successfully decoded base64 secret \\e[33;1m${name}\\e[0m"
+      else
+        fail "Failed decoding base64 secret \\e[33;1m${name}\\e[0m:\\n$(sed 's/^/... /g' "${errors}")"
+      fi
+      ;;
+    @hex@*)
+      decoded=$(mktemp)
+      errors=$(mktemp)
+      if echo "$value" | cut -c6- | sed 's/\([0-9A-F]\{2\}\)/\\\\x\1/gI' | xargs printf > "${decoded}" 2> "${errors}"
+      then
+        # shellcheck disable=SC2086
+        export ${name}="$(cat ${decoded})"
+        log_info "Successfully decoded hexadecimal secret \\e[33;1m${name}\\e[0m"
+      else
+        fail "Failed decoding hexadecimal secret \\e[33;1m${name}\\e[0m:\\n$(sed 's/^/... /g' "${errors}")"
+      fi
+      ;;
+    @url@*)
+      url=$(echo "$value" | cut -c6-)
+      if command -v curl > /dev/null
+      then
+        decoded=$(mktemp)
+        errors=$(mktemp)
+        if curl -s -S -f --connect-timeout 5 -o "${decoded}" "$url" 2> "${errors}"
+        then
+          # shellcheck disable=SC2086
+          export ${name}="$(cat ${decoded})"
+          log_info "Successfully curl'd secret \\e[33;1m${name}\\e[0m"
+        else
+          log_warn "Failed getting secret \\e[33;1m${name}\\e[0m:\\n$(sed 's/^/... /g' "${errors}")"
+        fi
+      elif command -v wget > /dev/null
+      then
+        decoded=$(mktemp)
+        errors=$(mktemp)
+        if wget -T 5 -O "${decoded}" "$url" 2> "${errors}"
+        then
+          # shellcheck disable=SC2086
+          export ${name}="$(cat ${decoded})"
+          log_info "Successfully wget'd secret \\e[33;1m${name}\\e[0m"
+        else
+          log_warn "Failed getting secret \\e[33;1m${name}\\e[0m:\\n$(sed 's/^/... /g' "${errors}")"
+        fi
+      else
+        fail "Couldn't get secret \\e[33;1m${name}\\e[0m: no http client found"
+      fi
+      ;;
+    esac
+  }
+
+  function eval_all_secrets() {
+    encoded_vars=$(env | grep -v '^scoped__' | awk -F '=' '/^[a-zA-Z0-9_]*=@(b64|hex|url)@/ {print $1}')
+    for var in $encoded_vars
+    do
+      eval_secret "$var"
+    done
+  }
+
+  function maybe_exec_hook() {
+    if [[ -f "$1" ]]
+    then
+      log_info "\\e[33;1m$1\\e[0m hook found: execute"
+      if [[ ! -x "$1" ]] && ! chmod +x "$1"
+      then
+        log_warn "... could not make \\e[33;1m${1}\\e[0m executable: please do it (chmod +x)"
+        # fallback technique
+        sh "$1"
+      else
+        "$1"
+      fi
+    fi
+  }
+
+  function output_coverage() {
+    echo "[TODO]: compute and output global coverage result"
+    echo "11% covered"
+  }
+
+  unscope_variables
+  eval_all_secrets
+
+  # ENDSCRIPT
+
+# job prototype
+# defines default Docker image, tracking probe, cache policy and tags
+.tpl-base:
+  image: $TPL_IMAGE
+  services:
+    - name: "$TBC_TRACKING_IMAGE"
+      command: ["--service", "template-build-cosign", "1.0.0"]
+  before_script:
+    - !reference [.tpl-scripts]
+    - install_ca_certs "${CUSTOM_CA_CERTS:-$DEFAULT_CA_CERTS}"
+  variables:
+    # TODO (if necessary): set cache dir variables
+    XDG_CACHE_HOME: "$CI_PROJECT_DIR/.cache"
+  cache:
+    # cache shall be per branch per template
+    key: "${CI_COMMIT_REF_SLUG}-template-build-cosign"
+    fallback_keys:
+      - "${CI_DEFAULT_BRANCH}-template-build-cosign"
+    when: always
+    # cache shall be per branch per template
+    key: "$CI_COMMIT_REF_SLUG-template-build-cosign"
+    when: always
+    paths:
+      - .cache/
+
+# (example) build & test job
+tpl-build:
+  extends: .tpl-base
+  stage: build
+  script:
+    - mkdir -p -m 777 reports
+    # TODO (if possible): $TRACE set enables debug logs on the tool
+    # TODO (if possible): force test tool to produce JUnit report(s)
+    # TODO (if possible): force test tool to compute code coverage with report
+    - cli-template-build-cosign ${TRACE+--verbose} --coverage --junit --output=reports/tpl-test.xunit.xml $TPL_BUILD_ARGS
+    - output_coverage
+  # TODO: code coverage support and GitLab integration (see: https://docs.gitlab.com/ee/ci/yaml/#coverage)
+  coverage: '/^(\d+.\d+\%) covered$/'
+  # keep build artifacts and test reports (see: https://docs.gitlab.com/ee/ci/yaml/#artifactsreportsjunit)
+  artifacts:
+    name: "$CI_JOB_NAME artifacts from $CI_PROJECT_NAME on $CI_COMMIT_REF_SLUG"
+    expire_in: 1 day
+    reports:
+      # TODO: Unit tests use JUnit format and GitLab integration (see: https://docs.gitlab.com/ee/ci/yaml/#artifactsreports)
+      junit:
+        - reports/tpl-test.xunit.xml
+    paths:
+        - build/
+        - reports/
+
+# (example) linter job
+tpl-lint:
+  extends: .tpl-base
+  stage: build
+  image: $TPL_LINT_IMAGE
+  # force no dependency
+  dependencies: []
+  script:
+    - mkdir -p -m 777 reports
+    - cli-template-build-cosign_lint ${TRACE+--verbose} --output=reports/tpl-lint.native.json $TPL_LINT_ARGS
+  artifacts:
+    name: "$CI_JOB_NAME artifacts from $CI_PROJECT_NAME on $CI_COMMIT_REF_SLUG"
+    expire_in: 1 day
+    when: always
+    paths:
+      - reports/tpl-lint.*
+  rules:
+    # exclude if $TPL_LINT_DISABLED
+    - if: '$TPL_LINT_DISABLED == "true"'
+      when: never
+    # .test-policy rules
+    - !reference [.test-policy, rules]
+
+# (example) dependency check job
+tpl-depcheck:
+  extends: .tpl-base
+  stage: test
+  image: $TPL_DEPCHECK_IMAGE
+  # force no dependency
+  dependencies: []
+  script:
+    - cli-template-build-cosign_depcheck ${TRACE+--verbose} $TPL_DEPCHECK_ARGS
+  rules:
+    # on schedule: auto
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      allow_failure: true
+      when: always
+    # all other cases: manual & non-blocking
+    - when: manual
+      allow_failure: true
+
+# (example) publish job activated on env ($TPL_PUBLISH_ENABLED), with required $TPL_PUBLISH_LOGIN and $TPL_PUBLISH_PASSWORD env verification
+tpl-publish:
+  extends: .tpl-base
+  stage: publish
+  before_script:
+    - !reference [.tpl-scripts]
+    # verify $TPL_PUBLISH_LOGIN and $TPL_PUBLISH_PASSWORD are set
+    - assert_defined "$TPL_PUBLISH_LOGIN" 'Missing required env $TPL_PUBLISH_LOGIN'
+    - assert_defined "$TPL_PUBLISH_PASSWORD" 'Missing required env $TPL_PUBLISH_PASSWORD'
+    - cli-template-build-cosign login --login=$TPL_PUBLISH_LOGIN --password=$TPL_PUBLISH_PASSWORD
+  script:
+    - cli-template-build-cosign $TPL_PUBLISH_ARGS
+  rules:
+    # exclude if $TPL_PUBLISH_ENABLED unset
+    - if: '$TPL_PUBLISH_ENABLED != "true"'
+      when: never
+    # on integration or production branch(es): manual & non-blocking
+    - if: '$CI_COMMIT_REF_NAME =~ $INTEG_REF || $CI_COMMIT_REF_NAME =~ $PROD_REF'
+      when: manual
+      allow_failure: true

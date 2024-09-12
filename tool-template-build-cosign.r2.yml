@@ -1,0 +1,13 @@
+files:
+    template: ./templates/gitlab-ci-template-build-cosign.yml
+    documentation: ./README.md
+    changelog: ./CHANGELOG.md
+data:
+    description: "Build, test and analyse your tool-template-build-cosign projects"
+    labels:
+    - to be continuous
+    - Build
+    - tool-template-build-cosign
+    public: true
+    license: LGPL v3
+    deprecated: false

@@ -1,0 +1,85 @@
+
+{
+  "name": "tool-template-build-cosign",
+  "description": "Build, test and verify your [tool-template-build-cosign](dont-exist) projects",
+  "template_path": "templates/gitlab-ci-template-build-cosign.yml",
+  "kind": "build",
+  "prefix": "tpl",
+  "job_prefix": "tpl",
+  "is_component": true,
+  "variables": [
+    {
+      "name": "TPL_IMAGE",
+      "description": "The Docker image used to run `cli-template-build-cosign`",
+      "default": "docker.io/template-build-cosign:1.2.3"
+    },
+    {
+      "name": "TPL_BUILD_ARGS",
+      "description": "Arguments used by the build job",
+      "default": "build --with-default-args",
+      "advanced": true
+    }
+  ],
+  "features": [
+    {
+      "id": "lint",
+      "name": "TPL lint",
+      "description": "[TPL lint](link-to-the-tool) analysis",
+      "disable_with": "TPL_LINT_DISABLED",
+      "variables": [
+        {
+          "name": "TPL_LINT_IMAGE",
+          "description": "The Docker image used to run the lint tool",
+          "default": "docker.io/template-build-cosign-lint:latest"
+        },
+        {
+          "name": "TPL_LINT_ARGS",
+          "description": "Lint [options and arguments](link-to-the-cli-options)",
+          "default": "--serevity=medium",
+          "advanced": true
+        }
+      ]
+    },
+    {
+      "id": "depcheck",
+      "name": "TPL dependency check",
+      "description": "[TPL dependency check](link-to-the-tool) analysis",
+      "variables": [
+        {
+          "name": "TPL_DEPCHECK_IMAGE",
+          "description": "The Docker image used to run the dependency check tool",
+          "default": "docker.io/template-build-cosign-depcheck:latest"
+        },
+        {
+          "name": "TPL_DEPCHECK_ARGS",
+          "description": "Dependency check [options and arguments](link-to-the-cli-options)",
+          "advanced": true
+        }
+      ]
+    },
+    {
+      "id": "publish",
+      "name": "Publish",
+      "description": "Publish your package to a repository",
+      "enable_with": "TPL_PUBLISH_ENABLED",
+      "variables": [
+        {
+          "name": "TPL_PUBLISH_ARGS",
+          "description": "Arguments used by the publish job",
+          "default": "publish --with-default-args",
+          "advanced": true
+        },
+        {
+          "name": "TPL_PUBLISH_LOGIN",
+          "description": "Login to use to publish",
+          "secret": true
+        },
+        {
+          "name": "TPL_PUBLISH_PASSWORD",
+          "description": "Password to use to publish",
+          "secret": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+include:
+  - project: "to-be-continuous/tools/gitlab-ci"
+    ref: "master"
+    file: "/templates/extract.yml"
+  - project: "to-be-continuous/tools/gitlab-ci"
+    ref: "master"
+    file: "/templates/validation.yml"
+  - project: "to-be-continuous/kicker"
+    ref: "master"
+    file: "/templates/validation.yml"
+  - component: $CI_SERVER_FQDN/to-be-continuous/bash/gitlab-ci-bash@3.4
+    inputs:
+      shellcheck-files: "*.sh"
+  - component: $CI_SERVER_FQDN/to-be-continuous/semantic-release/gitlab-ci-semrel@3.11
+
+variables:
+  GITLAB_CI_FILES: "templates/gitlab-ci-template-build-cosign.yml"
+
+semantic-release:
+  rules:
+    # on production branch(es): auto if SEMREL_AUTO_RELEASE_ENABLED
+    - if: '$TMPL_RELEASE_ENABLED == "true" && $CI_COMMIT_REF_NAME =~ $PROD_REF'
