@@ -11,7 +11,7 @@
     {
       "name": "TPL_IMAGE",
       "description": "The Docker image used to run `cli-template-build-cosign`",
-      "default": "docker.io/template-build-cosign:1.2.3"
+      "default": "192.168.100.73:5000/denisbalan/image-build-cosign:latest"
     },
     {
       "name": "TPL_BUILD_ARGS",
@@ -30,7 +30,7 @@
         {
           "name": "TPL_LINT_IMAGE",
           "description": "The Docker image used to run the lint tool",
-          "default": "docker.io/template-build-cosign-lint:latest"
+          "default": "192.168.100.73:5000/denisbalan/image-build-cosign:latest"
         },
         {
           "name": "TPL_LINT_ARGS",
@@ -48,7 +48,7 @@
         {
           "name": "TPL_DEPCHECK_IMAGE",
           "description": "The Docker image used to run the dependency check tool",
-          "default": "docker.io/template-build-cosign-depcheck:latest"
+          "default": "192.168.100.73:5000/denisbalan/image-build-cosign:latest"
         },
         {
           "name": "TPL_DEPCHECK_ARGS",
