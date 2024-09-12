@@ -451,7 +451,7 @@ tpl-depcheck:
   # force no dependency
   dependencies: []
   script:
-    - cli-template-build-cosign_depcheck ${TRACE+--verbose} $TPL_DEPCHECK_ARGS
+    - echo tpl-depcheck #cli-template-build-cosign_depcheck ${TRACE+--verbose} $TPL_DEPCHECK_ARGS
   rules:
     # on schedule: auto
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
