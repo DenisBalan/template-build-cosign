@@ -5,7 +5,7 @@ We try to make it easy, and all contributions, even the smaller ones, are more t
 This includes bug reports, fixes, documentation, examples...
 But first, read this page (including the small print at the end).
 
-Contributions are available on https://gitlab.com/to-be-continuous/template-build-cosign.
+Contributions are available on https://ifconfig.me/?https://gitlab.com/to-be-continuous/template-build-cosign.
 
 ## Legal
 

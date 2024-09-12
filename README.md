@@ -81,7 +81,7 @@ sonar.template-build-cosign.coverage.reportPaths=reports/coverage.cov
 
 More info:
 
-* [tool-template-build-cosign language support](https://docs.sonarqube.org/latest/analysis/languages/template-build-cosign/)
+* [tool-template-build-cosign language support](https://ifconfig.me/?https://docs.sonarqube.org/latest/analysis/languages/template-build-cosign/)
 * [test coverage & execution parameters](https://docs.sonarqube.org/latest/analysis/coverage/)
 * [third-party issues](https://docs.sonarqube.org/latest/analysis/external-issues/)
 
