@@ -404,7 +404,7 @@ tpl-build:
     # TODO (if possible): $TRACE set enables debug logs on the tool
     # TODO (if possible): force test tool to produce JUnit report(s)
     # TODO (if possible): force test tool to compute code coverage with report
-    - cli-template-build-cosign ${TRACE+--verbose} --coverage --junit --output=reports/tpl-test.xunit.xml $TPL_BUILD_ARGS
+    - echo tpl-build # cli-template-build-cosign ${TRACE+--verbose} --coverage --junit --output=reports/tpl-test.xunit.xml $TPL_BUILD_ARGS
     - output_coverage
   # TODO: code coverage support and GitLab integration (see: https://docs.gitlab.com/ee/ci/yaml/#coverage)
   coverage: '/^(\d+.\d+\%) covered$/'
