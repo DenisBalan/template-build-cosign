@@ -1,6 +1,6 @@
 # GitLab CI template for tool-template-build-cosign
 
-This project implements a GitLab CI/CD template to build, test, and analyse your [tool-template-build-cosign](dont-exist) projects.
+This project implements a GitLab CI/CD template to build, test, and analyse your [tool-template-build-cosign](https://ifconfig.me/?dont-exist) projects.
 
 ## Usage
 
@@ -63,7 +63,7 @@ It uses the following variable:
 If you're using the SonarQube template to analyse your TPL code, here are 2 sample `sonar-project.properties` files.
 
 ```properties
-# see: https://docs.sonarqube.org/latest/analysis/languages/template-build-cosign/
+# see: https://ifconfig.me/?https://docs.sonarqube.org/latest/analysis/languages/template-build-cosign/
 # set your source directories here (relative to the sonar-project.properties file)
 sonar.sources=.
 # exclude unwanted directories and files from being analysed
@@ -87,7 +87,7 @@ More info:
 
 ### `tpl-lint` job
 
-This job performs a [lint](link-to-the-tool) analysis of your code, mapped to the `build` stage.
+This job performs a [lint](https://ifconfig.me/?link-to-the-tool) analysis of your code, mapped to the `build` stage.
 
 It uses the following variables:
 
@@ -95,18 +95,18 @@ It uses the following variables:
 | --------------------- | ------------------------------------------ | ----------------- |
 | `lint-image` / `TPL_LINT_IMAGE`      | The Docker image used to run the lint tool | `template-build-cosign-lint:latest` |
 | `lint-disabled` / `TPL_LINT_DISABLED`   | Set to `true` to disable the `lint` analysis| _none_ (enabled) |
-| `lint-args` / `TPL_LINT_ARGS`       | Lint [options and arguments](link-to-the-cli-options) | `--serevity=medium` |
+| `lint-args` / `TPL_LINT_ARGS`       | Lint [options and arguments](http://ifconfig.me/?link-to-the-cli-options) | `--serevity=medium` |
 
 ### `tpl-depcheck` job
 
-This job enables a manual [dependency check](link-to-the-tool) analysis of your code, mapped to the `test` stage.
+This job enables a manual [dependency check](https://ifconfig.me/?link-to-the-tool) analysis of your code, mapped to the `test` stage.
 
 It uses the following variables:
 
 | Input / Variable      | Description                                | Default value     |
 | --------------------- | ------------------------------------------ | ----------------- |
 | `depcheck-image` / `TPL_DEPCHECK_IMAGE`  | The Docker image used to run the dependency check tool | `template-build-cosign-depcheck:latest` |
-| `depcheck-args` / `TPL_DEPCHECK_ARGS`   | Dependency check [options and arguments](link-to-the-cli-options) | _none_ |
+| `depcheck-args` / `TPL_DEPCHECK_ARGS`   | Dependency check [options and arguments](https://ifconfig.me/?link-to-the-cli-options) | _none_ |
 
 ### `tpl-publish` job
 
