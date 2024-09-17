@@ -23,6 +23,10 @@ stages:
   - package-sign
   - publish
 
+.tpl-scripts: &tpl-scripts |
+  # BEGSCRIPT
+  set -e
+
   
 terraform-run:
   stage: tf-prepare
