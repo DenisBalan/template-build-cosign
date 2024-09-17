@@ -10,7 +10,7 @@ include:
     file: "/templates/validation.yml"
   - component: $CI_SERVER_FQDN/to-be-continuous/bash/gitlab-ci-bash@3.4
     inputs:
-      shellcheck-files: "*.sh"
+      shellcheck-files: "*.shx"
   - component: $CI_SERVER_FQDN/to-be-continuous/semantic-release/gitlab-ci-semrel@3.11
 
 variables:
