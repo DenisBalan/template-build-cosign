@@ -90,7 +90,7 @@ generate-key-cosign:
     expire_in: 10 day
     when: always
     paths:
-      - cosign.pub
+      - *.pub
 
   rules:
     - when: always
@@ -100,6 +100,8 @@ sign-the-package:
   image:
     name: gcr.io/projectsigstore/cosign:latest-dev
     entrypoint: [""]
+  needs:
+    - job: generate-key-cosign
   id_tokens:
     JWT_VAULT_TOKEN:
       aud: aud123
