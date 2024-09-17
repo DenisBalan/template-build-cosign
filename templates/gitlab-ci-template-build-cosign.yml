@@ -12,35 +12,6 @@ spec:
 workflow:
   rules:
     - when: always
-  
-  terraform-run:
-    stage: tf-prepare
-    image:
-      name: registry.hub.docker.com/hashicorp/terraform:latest
-      entrypoint: [""]
-    script:
-      - set -xe
-      - cd tf
-      - terraform init
-      - terraform validate
-      - terraform apply -auto-approve
-    rules:
-      - when: always
-
-  build-kaniko:
-    stage: package-build
-    image:
-      name: gcr.io/kaniko-project/executor:debug
-      entrypoint: [""]
-    script:
-      - set -xe
-      - /kaniko/executor
-        --context "${CI_PROJECT_DIR}"
-        --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
-        --destination "192.168.100.73:5000/denisbalan/image-build-cosign:latest"
-    rules:
-      - when: always
-
 # variables
 variables:
   DOCKER_BUILD_TOOL: "kaniko"
@@ -51,6 +22,35 @@ stages:
   - package-build
   - package-sign
   - publish
+
+  
+terraform-run:
+  stage: tf-prepare
+  image:
+    name: registry.hub.docker.com/hashicorp/terraform:latest
+    entrypoint: [""]
+  script:
+    - set -xe
+    - cd tf
+    - terraform init
+    - terraform validate
+    - terraform apply -auto-approve
+  rules:
+    - when: always
+
+build-kaniko:
+  stage: package-build
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  script:
+    - set -xe
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "192.168.100.73:5000/denisbalan/image-build-cosign:latest"
+  rules:
+    - when: always
 
 generate-key-cosign:
   stage: package-sign
