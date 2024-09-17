@@ -94,7 +94,7 @@ generate-key-cosign:
   rules:
     - when: always
 
-sign-the-package:
+sign:
   stage: package-sign
   image:
     name: gcr.io/projectsigstore/cosign:latest-dev
@@ -125,13 +125,13 @@ sign-the-package:
     - ls -lahris .
     - echo 2
 
-verify-the-package:
+verify:
   stage: package-sign
   image:
     name: gcr.io/projectsigstore/cosign:latest-dev
     entrypoint: [""]
   needs:
-    - job: sign-the-package
+    - job: sign
   id_tokens:
     JWT_VAULT_TOKEN:
       aud: aud123
@@ -152,7 +152,7 @@ verify-the-package:
     - set -xe
     - export TRANSIT_SECRET_ENGINE_PATH="cosign_transit"
     - digest=192.168.100.73:5000/denisbalan/image-build-cosign:latest #$(docker inspect --format='{{index .RepoDigests 0}}' 192.168.100.73:5000/denisbalan/image-build-cosign:latest)
-    - cosign verify --key hashivault://denisbalan-nginx-cosign-key $digest
+    - cosign verify --key hashivault://denisbalan-nginx-cosign-key --insecure-ignore-tlog=true $digest
     - ls -lahris .
     - echo 2
   rules:
