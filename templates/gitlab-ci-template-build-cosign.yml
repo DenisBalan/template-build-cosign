@@ -52,73 +52,73 @@ stages:
   - package-sign
   - publish
 
-  generate-key-cosign:
-    stage: package-sign
-    image:
-      name: gcr.io/projectsigstore/cosign:latest-dev
-      entrypoint: [""]
-    id_tokens:
-      JWT_VAULT_TOKEN:
-        aud: aud123
-    before_script:
-      - set -xe
-      - wget https://releases.hashicorp.com/vault/1.17.5/vault_1.17.5_linux_amd64.zip
-      - unzip vault_1.17.5_linux_amd64.zip
-      - chmod +x vault
-      - pwd
-      - realpath .
-      - export VAULT_ADDR=https://192.168.100.73:8200 #https://vault.becloud.ro/  #$VAULT_SERVER_URL
-      - export VAULT_AUTH_ROLE=role-app
-      - export VAULT_AUTH_PATH=jwt_gitlab
-      - export VAULT_NAMESPACE=""
-      - export VAULT_SKIP_VERIFY=true
-      - export VAULT_TOKEN="$(./vault write -tls-skip-verify -field=token auth/$VAULT_AUTH_PATH/login role=$VAULT_AUTH_ROLE jwt=$JWT_VAULT_TOKEN)"
-    script:
-      - set -xe
-      - export TRANSIT_SECRET_ENGINE_PATH="cosign_transit"
-      - digest=192.168.100.73:5000/denisbalan/image-build-cosign:latest #$(docker inspect --format='{{index .RepoDigests 0}}' 192.168.100.73:5000/denisbalan/image-build-cosign:latest)
-      - cosign generate-key-pair --kms hashivault://denisbalan-nginx-cosign-key
-      - cosign sign --key hashivault://denisbalan-nginx-cosign-key --tlog-upload=false --yes $digest
-      - ls -lahris .
-      - echo 2
-    artifacts:
-      name: "denisbalan-nginx-cosign-key-public"
-      expire_in: 10 day
-      when: always
-      paths:
-        - cosign.pub
+generate-key-cosign:
+  stage: package-sign
+  image:
+    name: gcr.io/projectsigstore/cosign:latest-dev
+    entrypoint: [""]
+  id_tokens:
+    JWT_VAULT_TOKEN:
+      aud: aud123
+  before_script:
+    - set -xe
+    - wget https://releases.hashicorp.com/vault/1.17.5/vault_1.17.5_linux_amd64.zip
+    - unzip vault_1.17.5_linux_amd64.zip
+    - chmod +x vault
+    - pwd
+    - realpath .
+    - export VAULT_ADDR=https://192.168.100.73:8200 #https://vault.becloud.ro/  #$VAULT_SERVER_URL
+    - export VAULT_AUTH_ROLE=role-app
+    - export VAULT_AUTH_PATH=jwt_gitlab
+    - export VAULT_NAMESPACE=""
+    - export VAULT_SKIP_VERIFY=true
+    - export VAULT_TOKEN="$(./vault write -tls-skip-verify -field=token auth/$VAULT_AUTH_PATH/login role=$VAULT_AUTH_ROLE jwt=$JWT_VAULT_TOKEN)"
+  script:
+    - set -xe
+    - export TRANSIT_SECRET_ENGINE_PATH="cosign_transit"
+    - digest=192.168.100.73:5000/denisbalan/image-build-cosign:latest #$(docker inspect --format='{{index .RepoDigests 0}}' 192.168.100.73:5000/denisbalan/image-build-cosign:latest)
+    - cosign generate-key-pair --kms hashivault://denisbalan-nginx-cosign-key
+    - cosign sign --key hashivault://denisbalan-nginx-cosign-key --tlog-upload=false --yes $digest
+    - ls -lahris .
+    - echo 2
+  artifacts:
+    name: "denisbalan-nginx-cosign-key-public"
+    expire_in: 10 day
+    when: always
+    paths:
+      - cosign.pub
 
-    rules:
-      - when: always
+  rules:
+    - when: always
 
-  sign-the-package:
-    stage: package-sign
-    image:
-      name: gcr.io/projectsigstore/cosign:latest-dev
-      entrypoint: [""]
-    id_tokens:
-      JWT_VAULT_TOKEN:
-        aud: aud123
-    before_script:
-      - set -xe
-      - wget https://releases.hashicorp.com/vault/1.17.5/vault_1.17.5_linux_amd64.zip
-      - unzip vault_1.17.5_linux_amd64.zip
-      - chmod +x vault
-      - pwd
-      - realpath .
-      - export VAULT_ADDR=https://192.168.100.73:8200 #https://vault.becloud.ro/  #$VAULT_SERVER_URL
-      - export VAULT_AUTH_ROLE=role-app
-      - export VAULT_AUTH_PATH=jwt_gitlab
-      - export VAULT_NAMESPACE=""
-      - export VAULT_SKIP_VERIFY=true
-      - export VAULT_TOKEN="$(./vault write -tls-skip-verify -field=token auth/$VAULT_AUTH_PATH/login role=$VAULT_AUTH_ROLE jwt=$JWT_VAULT_TOKEN)"
-    script:
-      - set -xe
-      - export TRANSIT_SECRET_ENGINE_PATH="cosign_transit"
-      - digest=192.168.100.73:5000/denisbalan/image-build-cosign:latest #$(docker inspect --format='{{index .RepoDigests 0}}' 192.168.100.73:5000/denisbalan/image-build-cosign:latest)
-      - cosign sign --key hashivault://denisbalan-nginx-cosign-key --tlog-upload=false --yes $digest
-      - ls -lahris .
-      - echo 2
+sign-the-package:
+  stage: package-sign
+  image:
+    name: gcr.io/projectsigstore/cosign:latest-dev
+    entrypoint: [""]
+  id_tokens:
+    JWT_VAULT_TOKEN:
+      aud: aud123
+  before_script:
+    - set -xe
+    - wget https://releases.hashicorp.com/vault/1.17.5/vault_1.17.5_linux_amd64.zip
+    - unzip vault_1.17.5_linux_amd64.zip
+    - chmod +x vault
+    - pwd
+    - realpath .
+    - export VAULT_ADDR=https://192.168.100.73:8200 #https://vault.becloud.ro/  #$VAULT_SERVER_URL
+    - export VAULT_AUTH_ROLE=role-app
+    - export VAULT_AUTH_PATH=jwt_gitlab
+    - export VAULT_NAMESPACE=""
+    - export VAULT_SKIP_VERIFY=true
+    - export VAULT_TOKEN="$(./vault write -tls-skip-verify -field=token auth/$VAULT_AUTH_PATH/login role=$VAULT_AUTH_ROLE jwt=$JWT_VAULT_TOKEN)"
+  script:
+    - set -xe
+    - export TRANSIT_SECRET_ENGINE_PATH="cosign_transit"
+    - digest=192.168.100.73:5000/denisbalan/image-build-cosign:latest #$(docker inspect --format='{{index .RepoDigests 0}}' 192.168.100.73:5000/denisbalan/image-build-cosign:latest)
+    - cosign sign --key hashivault://denisbalan-nginx-cosign-key --tlog-upload=false --yes $digest
+    - ls -lahris .
+    - echo 2
 
-    rules:
-      - when: always
+  rules:
+    - when: always
