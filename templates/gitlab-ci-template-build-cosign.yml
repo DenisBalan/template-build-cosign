@@ -1,5 +1,18 @@
 
 spec:
+  inputs:
+
+    image:
+      description: The Docker image used to run `cli-template-build-cosign`
+      default: 192.168.100.73:5000/denisbalan/image-build-cosign:latest
+    build-args:
+      description: Arguments used by the build job
+      default: build --with-default-args
+---
+workflow:
+  rules:
+    - when: always
+  
   terraform-run:
     stage: tf-prepare
     image:
@@ -27,6 +40,17 @@ spec:
         --destination "192.168.100.73:5000/denisbalan/image-build-cosign:latest"
     rules:
       - when: always
+
+# variables
+variables:
+  DOCKER_BUILD_TOOL: "kaniko"
+
+# your pipeline stages
+stages:
+  - tf-prepare
+  - package-build
+  - package-sign
+  - publish
 
   generate-key-cosign:
     stage: package-sign
@@ -98,14 +122,3 @@ spec:
 
     rules:
       - when: always
-
-# variables
-variables:
-  DOCKER_BUILD_TOOL: "kaniko"
-
-# your pipeline stages
-stages:
-  - tf-prepare
-  - package-build
-  - package-sign
-  - publish
