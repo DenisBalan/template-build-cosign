@@ -90,7 +90,7 @@ generate-key-cosign:
     expire_in: 10 day
     when: always
     paths:
-      - *.pub
+      - '*.pub'
 
   rules:
     - when: always
